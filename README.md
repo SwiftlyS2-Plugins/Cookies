@@ -24,7 +24,7 @@
 
 ## Database Connection Key
 
-The database connection is using the key `cookies`. It supports only MySQL, MariaDB and PostgreSQL.
+The database connection is using the key `cookies`. It supports only SQLite, MySQL, MariaDB and PostgreSQL.
 
 ## API Reference
 
