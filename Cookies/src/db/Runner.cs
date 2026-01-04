@@ -20,6 +20,10 @@ public class MigrationRunner
                 {
                     rb.AddPostgres();
                 }
+                else if (dbConnString.StartsWith("sqlite", StringComparison.OrdinalIgnoreCase))
+                {
+                    rb.AddSQLite();
+                }
                 else throw new Exception("Unsupported database type.");
 
                 rb.WithGlobalConnectionString(dbConnection.ConnectionString).ScanIn(typeof(MigrationRunner).Assembly).For.Migrations();
