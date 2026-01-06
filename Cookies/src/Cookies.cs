@@ -103,7 +103,14 @@ public partial class Cookies : BasePlugin
                 while (SaveQueue.TryDequeue(out var steamid))
                 {
                     if (steamid == -1) ServerCookiesAPIv1?.Save();
-                    else PlayerCookiesAPIv1?.Save(Core.PlayerManager.GetAllPlayers().First(p => (long)p.SteamID == steamid));
+                    else
+                    {
+                        var player = Core.PlayerManager.GetAllPlayers().FirstOrDefault(p => p.IsValid && (long)p.SteamID == steamid);
+
+                        if (player == null) continue;
+
+                        PlayerCookiesAPIv1?.Save(player);
+                    }
                 }
             });
         });
