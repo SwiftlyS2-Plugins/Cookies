@@ -56,7 +56,7 @@ public class PlayerCookiesAPIv1 : IPlayerCookiesAPIv1
                     Data = []
                 };
                 var id = connection.Insert(user);
-                user.Id = (ulong)id;
+                user.Id = (ulong)(long)id;
             }
 
             user.Data = [];
@@ -113,7 +113,7 @@ public class PlayerCookiesAPIv1 : IPlayerCookiesAPIv1
                     Data = []
                 };
                 var id = connection.Insert(user);
-                user.Id = (ulong)id;
+                user.Id = (ulong)(long)id;
             }
 
             if (user.Data[key] is JsonElement element)
@@ -189,7 +189,7 @@ public class PlayerCookiesAPIv1 : IPlayerCookiesAPIv1
                 Data = []
             };
             var id = await connection.InsertAsync(user);
-            user.Id = (ulong)id;
+            user.Id = (ulong)(long)id;
         }
 
         cachedCookies[(long)player.SteamID] = user.Data;
@@ -218,7 +218,7 @@ public class PlayerCookiesAPIv1 : IPlayerCookiesAPIv1
                 Data = []
             };
             var id = await connection.InsertAsync(user);
-            user.Id = (ulong)id;
+            user.Id = (ulong)(long)id;
         }
 
         if (cachedCookies.TryGetValue(steamid, out var data))
@@ -267,7 +267,7 @@ public class PlayerCookiesAPIv1 : IPlayerCookiesAPIv1
                     Data = []
                 };
                 var id = connection.Insert(user);
-                user.Id = (ulong)id;
+                user.Id = (ulong)(long)id;
             }
 
 #pragma warning disable CS8601 // Possible null reference assignment.

@@ -90,7 +90,7 @@ public class ServerCookiesAPIv1 : IServerCookiesAPIv1
                 Data = []
             };
             var id = await connection.InsertAsync(user);
-            user.Id = (ulong)id;
+            user.Id = (ulong)(long)id;
         }
 
         CachedCookies[-1] = user.Data;
@@ -111,7 +111,7 @@ public class ServerCookiesAPIv1 : IServerCookiesAPIv1
                 Data = []
             };
             var id = await connection.InsertAsync(user);
-            user.Id = (ulong)id;
+            user.Id = (ulong)(long)id;
         }
 
         if (CachedCookies.TryGetValue(-1, out var data))
