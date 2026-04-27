@@ -189,7 +189,7 @@ public class PlayerCookiesAPIv1 : IPlayerCookiesAPIv1
                 Data = []
             };
             var id = await connection.InsertAsync(user);
-            user.Id = (ulong)(long)id;
+            user.Id = (ulong)id;
         }
 
         cachedCookies[(long)player.SteamID] = user.Data;
@@ -218,7 +218,7 @@ public class PlayerCookiesAPIv1 : IPlayerCookiesAPIv1
                 Data = []
             };
             var id = await connection.InsertAsync(user);
-            user.Id = (ulong)(long)id;
+            user.Id = (ulong)id;
         }
 
         if (cachedCookies.TryGetValue(steamid, out var data))
@@ -267,7 +267,7 @@ public class PlayerCookiesAPIv1 : IPlayerCookiesAPIv1
                     Data = []
                 };
                 var id = connection.Insert(user);
-                user.Id = (ulong)(long)id;
+                user.Id = (ulong)id;
             }
 
 #pragma warning disable CS8601 // Possible null reference assignment.
