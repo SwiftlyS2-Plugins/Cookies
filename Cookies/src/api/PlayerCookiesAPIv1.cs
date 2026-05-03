@@ -56,7 +56,18 @@ public class PlayerCookiesAPIv1 : IPlayerCookiesAPIv1
                     Data = []
                 };
                 var id = connection.Insert(user);
-                user.Id = (ulong)(long)id;
+                if (id is long longId)
+                {
+                    user.Id = (ulong)longId;
+                }
+                else if (id is ulong ulongId)
+                {
+                    user.Id = ulongId;
+                }
+                else
+                {
+                    throw new Exception("Unexpected ID type returned from database.");
+                }
             }
 
             user.Data = [];
@@ -113,7 +124,18 @@ public class PlayerCookiesAPIv1 : IPlayerCookiesAPIv1
                     Data = []
                 };
                 var id = connection.Insert(user);
-                user.Id = (ulong)(long)id;
+                if (id is long longId)
+                {
+                    user.Id = (ulong)longId;
+                }
+                else if (id is ulong ulongId)
+                {
+                    user.Id = ulongId;
+                }
+                else
+                {
+                    throw new Exception("Unexpected ID type returned from database.");
+                }
             }
 
             if (user.Data[key] is JsonElement element)
@@ -189,7 +211,18 @@ public class PlayerCookiesAPIv1 : IPlayerCookiesAPIv1
                 Data = []
             };
             var id = await connection.InsertAsync(user);
-            user.Id = (ulong)id;
+            if (id is long longId)
+            {
+                user.Id = (ulong)longId;
+            }
+            else if (id is ulong ulongId)
+            {
+                user.Id = ulongId;
+            }
+            else
+            {
+                throw new Exception("Unexpected ID type returned from database.");
+            }
         }
 
         cachedCookies[(long)player.SteamID] = user.Data;
@@ -218,7 +251,18 @@ public class PlayerCookiesAPIv1 : IPlayerCookiesAPIv1
                 Data = []
             };
             var id = await connection.InsertAsync(user);
-            user.Id = (ulong)id;
+            if (id is long longId)
+            {
+                user.Id = (ulong)longId;
+            }
+            else if (id is ulong ulongId)
+            {
+                user.Id = ulongId;
+            }
+            else
+            {
+                throw new Exception("Unexpected ID type returned from database.");
+            }
         }
 
         if (cachedCookies.TryGetValue(steamid, out var data))
@@ -267,7 +311,18 @@ public class PlayerCookiesAPIv1 : IPlayerCookiesAPIv1
                     Data = []
                 };
                 var id = connection.Insert(user);
-                user.Id = (ulong)id;
+                if (id is long longId)
+                {
+                    user.Id = (ulong)longId;
+                }
+                else if (id is ulong ulongId)
+                {
+                    user.Id = ulongId;
+                }
+                else
+                {
+                    throw new Exception("Unexpected ID type returned from database.");
+                }
             }
 
 #pragma warning disable CS8601 // Possible null reference assignment.

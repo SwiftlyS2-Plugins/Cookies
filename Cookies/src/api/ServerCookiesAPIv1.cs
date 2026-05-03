@@ -90,7 +90,18 @@ public class ServerCookiesAPIv1 : IServerCookiesAPIv1
                 Data = []
             };
             var id = await connection.InsertAsync(user);
-            user.Id = (ulong)(long)id;
+            if (id is long longId)
+            {
+                user.Id = (ulong)longId;
+            }
+            else if (id is ulong ulongId)
+            {
+                user.Id = ulongId;
+            }
+            else
+            {
+                throw new Exception("Unexpected ID type returned from database.");
+            }
         }
 
         CachedCookies[-1] = user.Data;
@@ -111,7 +122,18 @@ public class ServerCookiesAPIv1 : IServerCookiesAPIv1
                 Data = []
             };
             var id = await connection.InsertAsync(user);
-            user.Id = (ulong)(long)id;
+            if (id is long longId)
+            {
+                user.Id = (ulong)longId;
+            }
+            else if (id is ulong ulongId)
+            {
+                user.Id = ulongId;
+            }
+            else
+            {
+                throw new Exception("Unexpected ID type returned from database.");
+            }
         }
 
         if (CachedCookies.TryGetValue(-1, out var data))
