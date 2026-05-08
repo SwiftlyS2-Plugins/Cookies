@@ -28,7 +28,24 @@ The database connection is using the key `cookies`. It supports only SQLite, MyS
 
 ## API Reference
 
-The Cookies plugin provides two main APIs for managing persistent variables:
+The Cookies plugin provides two main APIs for managing persistent variables.
+
+### Interface Keys
+
+To use these APIs in your plugin, retrieve them using the `IInterfaceManager` with the following keys:
+
+| Interface | Key |
+|-----------|-----|
+| `IServerCookiesAPIv1` | `"Cookies.Server.v1"` |
+| `IServerCookiesAPIv2` | `"Cookies.Server.v2"` |
+| `IPlayerCookiesAPIv1` | `"Cookies.Player.v1"` |
+| `IPlayerCookiesAPIv2` | `"Cookies.Player.v2"` |
+
+**Example:**
+```csharp
+var serverCookiesV2 = interfaceManager.GetSharedInterface<IServerCookiesAPIv2>("Cookies.Server.v2");
+var playerCookiesV2 = interfaceManager.GetSharedInterface<IPlayerCookiesAPIv2>("Cookies.Player.v2");
+```
 
 ### Server Cookies API (`IServerCookiesAPIv1`)
 
@@ -68,6 +85,55 @@ Manage server-wide persistent variables that are shared across all players.
 **`void Save()`**
 - Saves the server's cookies to the database.
 
+### Server Cookies API v2 (`IServerCookiesAPIv2`)
+
+Extended version of the Server Cookies API with additional convenience methods.
+
+#### Methods (Inherited from v1)
+
+- `T? Get<T>(string key)`
+- `bool Has(string key)`
+- `void Set<T>(string key, T value)`
+- `void Unset(string key)`
+- `void Clear()`
+- `void Load()`
+- `void Save()`
+
+#### New Methods in v2
+
+**`T? GetSession<T>(string key)`**
+- Gets a variable from the server's data storage.
+- **Parameters:**
+  - `key` - The key of the variable.
+- **Returns:** The value of the variable, or `null` if it doesn't exist.
+
+**`T? GetSessionOrDefault<T>(string key, T defaultValue)`**
+- Gets a variable from the server's data storage, or returns a default value if it doesn't exist.
+- **Parameters:**
+  - `key` - The key of the variable.
+  - `defaultValue` - The default value to return if the variable doesn't exist.
+- **Returns:** The value of the variable, or the default value if it doesn't exist.
+
+**`bool HasSession(string key)`**
+- Checks if a variable exists in the server's data storage.
+- **Parameters:**
+  - `key` - The key of the variable.
+- **Returns:** `true` if the variable exists, `false` otherwise.
+
+**`void SetSession<T>(string key, T value)`**
+- Sets a variable in the server's data storage.
+- **Parameters:**
+  - `key` - The key of the variable.
+  - `value` - The value of the variable.
+
+**`void ClearSession()`**
+- Clears all stored data for the server.
+
+**`void UnsetSession(string key)`**
+- Unsets a variable from the server's data storage.
+- **Parameters:**
+  - `key` - The key of the variable.
+
 ### Player Cookies API (`IPlayerCookiesAPIv1`)
 
 Manage player-specific persistent variables. Each method has two overloads - one accepting an `IPlayer` object and another accepting a `steamid`.
@@ -92,6 +158,54 @@ Manage player-specific persistent variables. Each method has two overloads - one
 
 **`void Set<T>(IPlayer player, string key, T value)`**
 **`void Set<T>(long steamid, string key, T value)`**
+- Sets a variable in the player's data storage.
+- **Parameters:**
+  - `player` / `steamid` - The player or their SteamID.
+  - `key` - The key of the variable.
+  - `value` - The value of the variable.
+
+### Player Cookies API v2 (`IPlayerCookiesAPIv2`)
+
+Extended version of the Player Cookies API with additional convenience methods. All methods have two overloads - one accepting an `IPlayer` object and another accepting a `steamid`.
+
+#### Methods (Inherited from v1)
+
+- `T? Get<T>(IPlayer player, string key)`
+- `T? Get<T>(long steamid, string key)`
+- `bool Has(IPlayer player, string key)`
+- `bool Has(long steamid, string key)`
+- `void Set<T>(IPlayer player, string key, T value)`
+- `void Set<T>(long steamid, string key, T value)`
+
+#### New Methods in v2
+
+**`T? GetSession<T>(IPlayer player, string key)`**
+**`T? GetSession<T>(long steamid, string key)`**
+- Gets a variable from the player's data storage.
+- **Parameters:**
+  - `player` / `steamid` - The player or their SteamID.
+  - `key` - The key of the variable.
+- **Returns:** The value of the variable, or `null` if it doesn't exist.
+
+**`T? GetSessionOrDefault<T>(IPlayer player, string key, T defaultValue)`**
+**`T? GetSessionOrDefault<T>(long steamid, string key, T defaultValue)`**
+- Gets a variable from the player's data storage, or returns a default value if it doesn't exist.
+- **Parameters:**
+  - `player` / `steamid` - The player or their SteamID.
+  - `key` - The key of the variable.
+  - `defaultValue` - The default value to return if the variable doesn't exist.
+- **Returns:** The value of the variable, or the default value if it doesn't exist.
+
+**`bool HasSession(IPlayer player, string key)`**
+**`bool HasSession(long steamid, string key)`**
+- Checks if a variable exists in the player's data storage.
+- **Parameters:**
+  - `player` / `steamid` - The player or their SteamID.
+  - `key` - The key of the variable.
+- **Returns:** `true` if the variable exists, `false` otherwise.
+
+**`void SetSession<T>(IPlayer player, string key, T value)`**
+**`void SetSession<T>(long steamid, string key, T value)`**
 - Sets a variable in the player's data storage.
 - **Parameters:**
   - `player` / `steamid` - The player or their SteamID.
