@@ -14,6 +14,7 @@ public class PlayerCookiesAPIv1 : IPlayerCookiesAPIv1
     private ConcurrentDictionary<long, Dictionary<string, object>> cachedCookies;
     private ConcurrentQueue<long> saveQueue;
     private ConcurrentDictionary<long, IPlayer> playerBySteamId;
+    protected JsonSerializerOptions jsonOptions = new() { IncludeFields = true };
 
     public PlayerCookiesAPIv1(ISwiftlyCore core, ref ConcurrentDictionary<long, Dictionary<string, object>> cachedCookies, ref ConcurrentQueue<long> saveQueue, ref ConcurrentDictionary<long, IPlayer> playerBySteamId)
     {
@@ -32,9 +33,9 @@ public class PlayerCookiesAPIv1 : IPlayerCookiesAPIv1
     {
         if (playerBySteamId.ContainsKey(steamid))
         {
-            if (cachedCookies.ContainsKey(steamid))
+            if (cachedCookies.TryGetValue(steamid, out var value))
             {
-                cachedCookies[steamid].Clear();
+                value.Clear();
                 if (!saveQueue.Contains(steamid))
                 {
                     saveQueue.Enqueue(steamid);
@@ -90,7 +91,7 @@ public class PlayerCookiesAPIv1 : IPlayerCookiesAPIv1
                 {
                     if (value is JsonElement element)
                     {
-                        return JsonSerializer.Deserialize<T>(element.GetRawText(), new JsonSerializerOptions { IncludeFields = true });
+                        return JsonSerializer.Deserialize<T>(element.GetRawText(), jsonOptions);
                     }
                     else if (value is T typedValue)
                     {
@@ -99,7 +100,7 @@ public class PlayerCookiesAPIv1 : IPlayerCookiesAPIv1
                     else
                     {
                         string json = JsonSerializer.Serialize(value);
-                        return JsonSerializer.Deserialize<T>(json, new JsonSerializerOptions { IncludeFields = true });
+                        return JsonSerializer.Deserialize<T>(json, jsonOptions);
                     }
                 }
                 catch (Exception)
@@ -140,7 +141,7 @@ public class PlayerCookiesAPIv1 : IPlayerCookiesAPIv1
 
             if (user.Data[key] is JsonElement element)
             {
-                return JsonSerializer.Deserialize<T>(element.GetRawText(), new JsonSerializerOptions { IncludeFields = true });
+                return JsonSerializer.Deserialize<T>(element.GetRawText(), jsonOptions);
             }
             else if (user.Data[key] is T typedValue)
             {
@@ -149,7 +150,7 @@ public class PlayerCookiesAPIv1 : IPlayerCookiesAPIv1
             else
             {
                 string json = JsonSerializer.Serialize(user.Data[key]);
-                return JsonSerializer.Deserialize<T>(json, new JsonSerializerOptions { IncludeFields = true });
+                return JsonSerializer.Deserialize<T>(json, jsonOptions);
             }
         }
     }
@@ -284,7 +285,7 @@ public class PlayerCookiesAPIv1 : IPlayerCookiesAPIv1
         {
             if (!cachedCookies.ContainsKey(steamid))
             {
-                cachedCookies[steamid] = new Dictionary<string, object>();
+                cachedCookies[steamid] = [];
             }
 
 #pragma warning disable CS8601 // Possible null reference assignment.

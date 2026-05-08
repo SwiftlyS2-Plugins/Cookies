@@ -14,6 +14,7 @@ namespace Cookies;
 public partial class Cookies : BasePlugin
 {
     private ConcurrentDictionary<long, Dictionary<string, object>> CachedCookies = new();
+    private ConcurrentDictionary<long, Dictionary<string, object>> SessionCookies = new();
     private ConcurrentQueue<long> SaveQueue = new();
     private ConcurrentDictionary<long, IPlayer> playerBySteamId = new();
     private CancellationTokenSource? saveTaskCancellationTokenSource;
@@ -43,6 +44,12 @@ public partial class Cookies : BasePlugin
         );
         interfaceManager.AddSharedInterface<IPlayerCookiesAPIv1, PlayerCookiesAPIv1>(
             "Cookies.Player.v1", new PlayerCookiesAPIv1(Core, ref CachedCookies, ref SaveQueue, ref playerBySteamId)
+        );
+        interfaceManager.AddSharedInterface<IServerCookiesAPIv2, ServerCookiesAPIv2>(
+            "Cookies.Server.v2", new ServerCookiesAPIv2(Core, ref CachedCookies, ref SaveQueue, ref SessionCookies)
+        );
+        interfaceManager.AddSharedInterface<IPlayerCookiesAPIv2, PlayerCookiesAPIv2>(
+            "Cookies.Player.v2", new PlayerCookiesAPIv2(Core, ref CachedCookies, ref SaveQueue, ref playerBySteamId, ref SessionCookies)
         );
     }
 

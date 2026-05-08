@@ -12,6 +12,7 @@ public class ServerCookiesAPIv1 : IServerCookiesAPIv1
     private ISwiftlyCore Core;
     private ConcurrentDictionary<long, Dictionary<string, object>> CachedCookies;
     private ConcurrentQueue<long> SaveQueue;
+    protected JsonSerializerOptions jsonOptions = new() { IncludeFields = true };
 
     public ServerCookiesAPIv1(ISwiftlyCore core, ref ConcurrentDictionary<long, Dictionary<string, object>> cachedCookies, ref ConcurrentQueue<long> saveQueue)
     {
@@ -22,7 +23,7 @@ public class ServerCookiesAPIv1 : IServerCookiesAPIv1
 
     public void Clear()
     {
-        if (CachedCookies.TryGetValue(-1, out Dictionary<string, object>? value))
+        if (CachedCookies.TryGetValue(-1, out var value))
         {
             value.Clear();
             if (!SaveQueue.Contains(-1))
@@ -40,7 +41,7 @@ public class ServerCookiesAPIv1 : IServerCookiesAPIv1
             {
                 if (value is JsonElement element)
                 {
-                    return JsonSerializer.Deserialize<T>(element.GetRawText(), new JsonSerializerOptions { IncludeFields = true });
+                    return JsonSerializer.Deserialize<T>(element.GetRawText(), jsonOptions);
                 }
                 else if (value is T typedValue)
                 {
@@ -49,7 +50,7 @@ public class ServerCookiesAPIv1 : IServerCookiesAPIv1
                 else
                 {
                     string json = JsonSerializer.Serialize(value);
-                    return JsonSerializer.Deserialize<T>(json, new JsonSerializerOptions { IncludeFields = true });
+                    return JsonSerializer.Deserialize<T>(json, jsonOptions);
                 }
             }
             catch (Exception)
@@ -148,7 +149,7 @@ public class ServerCookiesAPIv1 : IServerCookiesAPIv1
     {
         if (!CachedCookies.ContainsKey(-1))
         {
-            CachedCookies[-1] = new Dictionary<string, object>();
+            CachedCookies[-1] = [];
         }
 
 #pragma warning disable CS8601 // Possible null reference assignment.
@@ -162,9 +163,9 @@ public class ServerCookiesAPIv1 : IServerCookiesAPIv1
 
     public void Unset(string key)
     {
-        if (CachedCookies.ContainsKey(-1) && CachedCookies[-1].ContainsKey(key))
+        if (CachedCookies.TryGetValue(-1, out var value) && value.ContainsKey(key))
         {
-            CachedCookies[-1].Remove(key);
+            value.Remove(key);
             if (!SaveQueue.Contains(-1))
             {
                 SaveQueue.Enqueue(-1);
