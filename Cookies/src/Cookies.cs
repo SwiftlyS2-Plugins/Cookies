@@ -10,7 +10,7 @@ using SwiftlyS2.Shared.Plugins;
 
 namespace Cookies;
 
-[PluginMetadata(Id = "Cookies", Version = "1.0.9", Name = "Cookies", Author = "Swiftly Development Team")]
+[PluginMetadata(Id = "Cookies", Version = "1.0.10", Name = "Cookies", Author = "Swiftly Development Team")]
 public partial class Cookies : BasePlugin
 {
     private ConcurrentDictionary<long, Dictionary<string, object>> CachedCookies = new();
