@@ -61,8 +61,8 @@ public partial class Cookies : BasePlugin
         }
     }
 
-    [EventListener<EventDelegates.OnClientSteamAuthorize>]
-    public void OnClientSteamAuthorize(IOnClientSteamAuthorizeEvent @event)
+    [EventListener<EventDelegates.OnClientPutInServer>]
+    public void IOnClientPutInServerEvent(IOnClientPutInServerEvent @event)
     {
         var playerid = @event.PlayerId;
 
