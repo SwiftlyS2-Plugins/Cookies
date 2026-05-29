@@ -235,3 +235,30 @@ Extended version of the Player Cookies API with additional convenience methods. 
 - Saves the player's cookies to the database.
 - **Parameters:**
   - `player` / `steamid` - The player or their SteamID.
+
+### On-server layout
+
+After both plugins are installed on a SwiftlyS2 server, the relevant paths look
+like this:
+
+```
+addons/swiftlys2/plugins/
+├── Cookies/
+│   ├── Cookies.dll
+│   └── resources/
+│       └── exports/
+│           └── Cookies.Contract.dll      <-- shared contract, loaded ONCE by the host
+└── YourS2Plugin/
+    └── YourS2Plugin.dll                  <-- your plugin, references the contract above
+```
+
+Key points:
+
+- `Cookies.Contract.dll` **only** ships inside `Cookies/resources/exports/`.
+  It is owned by the Cookies plugin install.
+- `YourS2Plugin/` must **not** contain its own copy of `Cookies.Contract.dll`
+  (that's what the `Private=false` / `ExcludeAssets=runtime` settings in
+  section 4 guarantee at publish time).
+- If `Cookies/` is missing on the server, `GetSharedInterface<...>(...)` in
+  your plugin will return `null` — handle it gracefully or declare Cookies as
+  a hard dependency in your plugin manifest.
