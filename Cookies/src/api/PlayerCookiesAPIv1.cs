@@ -199,16 +199,19 @@ public class PlayerCookiesAPIv1 : IPlayerCookiesAPIv1
 
     public async Task Load(IPlayer player)
     {
+        if(!player.IsValid) return;
+        
         var connection = core.Database.GetConnection("cookies");
+        var steamid = (long)player.SteamID;
 
-        var users = await connection.SelectAsync<PlayerCookie>(u => u.SteamId64 == (long)player.SteamID);
+        var users = await connection.SelectAsync<PlayerCookie>(u => u.SteamId64 == steamid);
         var user = users.FirstOrDefault();
 
         if (user == null)
         {
             user = new PlayerCookie
             {
-                SteamId64 = (long)player.SteamID,
+                SteamId64 = steamid,
                 Data = []
             };
             var id = await connection.InsertAsync(user);
@@ -226,8 +229,8 @@ public class PlayerCookiesAPIv1 : IPlayerCookiesAPIv1
             }
         }
 
-        cachedCookies[(long)player.SteamID] = user.Data;
-        playerBySteamId[(long)player.SteamID] = player;
+        cachedCookies[steamid] = user.Data;
+        playerBySteamId[steamid] = player;
     }
 
     public async Task Save(IPlayer player)
