@@ -89,19 +89,7 @@ public class PlayerCookiesAPIv1 : IPlayerCookiesAPIv1
             {
                 try
                 {
-                    if (value is JsonElement element)
-                    {
-                        return JsonSerializer.Deserialize<T>(element.GetRawText(), jsonOptions);
-                    }
-                    else if (value is T typedValue)
-                    {
-                        return typedValue;
-                    }
-                    else
-                    {
-                        string json = JsonSerializer.Serialize(value);
-                        return JsonSerializer.Deserialize<T>(json, jsonOptions);
-                    }
+                    return CookieValueConverter.Convert<T>(value, jsonOptions);
                 }
                 catch (Exception)
                 {
@@ -139,19 +127,7 @@ public class PlayerCookiesAPIv1 : IPlayerCookiesAPIv1
                 }
             }
 
-            if (user.Data[key] is JsonElement element)
-            {
-                return JsonSerializer.Deserialize<T>(element.GetRawText(), jsonOptions);
-            }
-            else if (user.Data[key] is T typedValue)
-            {
-                return typedValue;
-            }
-            else
-            {
-                string json = JsonSerializer.Serialize(user.Data[key]);
-                return JsonSerializer.Deserialize<T>(json, jsonOptions);
-            }
+            return CookieValueConverter.Convert<T>(user.Data[key], jsonOptions);
         }
     }
 
@@ -162,12 +138,63 @@ public class PlayerCookiesAPIv1 : IPlayerCookiesAPIv1
 
     public T? GetOrDefault<T>(long steamid, string key, T defaultValue)
     {
-        if (!Has(steamid, key))
+        if (cachedCookies.TryGetValue(steamid, out var data))
         {
+            if (data.TryGetValue(key, out var value))
+            {
+                try
+                {
+                    return CookieValueConverter.Convert<T>(value, jsonOptions);
+                }
+                catch (Exception)
+                {
+                    return default;
+                }
+            }
+
             Set(steamid, key, defaultValue);
             return defaultValue;
         }
-        else return Get<T>(steamid, key);
+        else
+        {
+            var connection = core.Database.GetConnection("cookies");
+
+            var users = connection.Select<PlayerCookie>(u => u.SteamId64 == steamid);
+            var user = users.FirstOrDefault();
+
+            if (user == null)
+            {
+                user = new PlayerCookie
+                {
+                    SteamId64 = steamid,
+                    Data = []
+                };
+                var id = connection.Insert(user);
+                if (id is long longId)
+                {
+                    user.Id = (ulong)longId;
+                }
+                else if (id is ulong ulongId)
+                {
+                    user.Id = ulongId;
+                }
+                else
+                {
+                    throw new Exception("Unexpected ID type returned from database.");
+                }
+            }
+
+            if (user.Data.TryGetValue(key, out var raw))
+            {
+                return CookieValueConverter.Convert<T>(raw, jsonOptions);
+            }
+
+#pragma warning disable CS8601 // Possible null reference assignment.
+            user.Data[key] = defaultValue;
+#pragma warning restore CS8601 // Possible null reference assignment.
+            connection.Update(user);
+            return defaultValue;
+        }
     }
 
     public bool Has(IPlayer player, string key)
@@ -286,13 +313,10 @@ public class PlayerCookiesAPIv1 : IPlayerCookiesAPIv1
     {
         if (playerBySteamId.ContainsKey(steamid))
         {
-            if (!cachedCookies.ContainsKey(steamid))
-            {
-                cachedCookies[steamid] = [];
-            }
+            var data = cachedCookies.GetOrAdd(steamid, static _ => new Dictionary<string, object>());
 
 #pragma warning disable CS8601 // Possible null reference assignment.
-            cachedCookies[steamid][key] = value;
+            data[key] = value;
 #pragma warning restore CS8601 // Possible null reference assignment.
 
             if (!saveQueue.Contains(steamid))

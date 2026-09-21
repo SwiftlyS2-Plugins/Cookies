@@ -1,5 +1,4 @@
 using System.Collections.Concurrent;
-using System.Text.Json;
 using Cookies.Contract;
 using SwiftlyS2.Shared;
 using SwiftlyS2.Shared.Players;
@@ -47,19 +46,7 @@ public class PlayerCookiesAPIv2 : PlayerCookiesAPIv1, IPlayerCookiesAPIv2
             {
                 try
                 {
-                    if (value is JsonElement element)
-                    {
-                        return JsonSerializer.Deserialize<T>(element.GetRawText(), jsonOptions);
-                    }
-                    else if (value is T typedValue)
-                    {
-                        return typedValue;
-                    }
-                    else
-                    {
-                        string json = JsonSerializer.Serialize(value);
-                        return JsonSerializer.Deserialize<T>(json, jsonOptions);
-                    }
+                    return CookieValueConverter.Convert<T>(value, jsonOptions);
                 }
                 catch (Exception)
                 {
@@ -103,13 +90,10 @@ public class PlayerCookiesAPIv2 : PlayerCookiesAPIv1, IPlayerCookiesAPIv2
 
     public void SetSession<T>(long steamid, string key, T value)
     {
-        if (!sessionCookies.ContainsKey(steamid))
-        {
-            sessionCookies[steamid] = [];
-        }
+        var data = sessionCookies.GetOrAdd(steamid, static _ => new Dictionary<string, object>());
 
 #pragma warning disable CS8601 // Possible null reference assignment.
-        sessionCookies[steamid][key] = value;
+        data[key] = value;
 #pragma warning restore CS8601 // Possible null reference assignment.
     }
 

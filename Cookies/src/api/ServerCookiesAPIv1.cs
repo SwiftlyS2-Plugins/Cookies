@@ -39,19 +39,7 @@ public class ServerCookiesAPIv1 : IServerCookiesAPIv1
         {
             try
             {
-                if (value is JsonElement element)
-                {
-                    return JsonSerializer.Deserialize<T>(element.GetRawText(), jsonOptions);
-                }
-                else if (value is T typedValue)
-                {
-                    return typedValue;
-                }
-                else
-                {
-                    string json = JsonSerializer.Serialize(value);
-                    return JsonSerializer.Deserialize<T>(json, jsonOptions);
-                }
+                return CookieValueConverter.Convert<T>(value, jsonOptions);
             }
             catch (Exception)
             {
@@ -73,7 +61,7 @@ public class ServerCookiesAPIv1 : IServerCookiesAPIv1
 
     public bool Has(string key)
     {
-        return CachedCookies.ContainsKey(-1) && CachedCookies[-1].ContainsKey(key);
+        return CachedCookies.TryGetValue(-1, out var data) && data.ContainsKey(key);
     }
 
     public async Task Load()
@@ -147,13 +135,10 @@ public class ServerCookiesAPIv1 : IServerCookiesAPIv1
 
     public void Set<T>(string key, T value)
     {
-        if (!CachedCookies.ContainsKey(-1))
-        {
-            CachedCookies[-1] = [];
-        }
+        var data = CachedCookies.GetOrAdd(-1, static _ => new Dictionary<string, object>());
 
 #pragma warning disable CS8601 // Possible null reference assignment.
-        CachedCookies[-1][key] = value;
+        data[key] = value;
 #pragma warning restore CS8601 // Possible null reference assignment.
         if (!SaveQueue.Contains(-1))
         {
@@ -163,9 +148,8 @@ public class ServerCookiesAPIv1 : IServerCookiesAPIv1
 
     public void Unset(string key)
     {
-        if (CachedCookies.TryGetValue(-1, out var value) && value.ContainsKey(key))
+        if (CachedCookies.TryGetValue(-1, out var value) && value.Remove(key))
         {
-            value.Remove(key);
             if (!SaveQueue.Contains(-1))
             {
                 SaveQueue.Enqueue(-1);

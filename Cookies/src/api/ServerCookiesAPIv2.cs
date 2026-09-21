@@ -1,8 +1,5 @@
 using System.Collections.Concurrent;
-using System.Text.Json;
 using Cookies.Contract;
-using Cookies.Database.Models;
-using Dommel;
 using SwiftlyS2.Shared;
 
 namespace Cookies.API;
@@ -35,19 +32,7 @@ public class ServerCookiesAPIv2 : ServerCookiesAPIv1, IServerCookiesAPIv2
         {
             try
             {
-                if (value is JsonElement element)
-                {
-                    return JsonSerializer.Deserialize<T>(element.GetRawText(), jsonOptions);
-                }
-                else if (value is T typedValue)
-                {
-                    return typedValue;
-                }
-                else
-                {
-                    string json = JsonSerializer.Serialize(value);
-                    return JsonSerializer.Deserialize<T>(json, jsonOptions);
-                }
+                return CookieValueConverter.Convert<T>(value, jsonOptions);
             }
             catch (Exception)
             {
@@ -74,13 +59,10 @@ public class ServerCookiesAPIv2 : ServerCookiesAPIv1, IServerCookiesAPIv2
 
     public void SetSession<T>(string key, T value)
     {
-        if (!sessionCookies.ContainsKey(-1))
-        {
-            sessionCookies[-1] = [];
-        }
+        var data = sessionCookies.GetOrAdd(-1, static _ => new Dictionary<string, object>());
 
 #pragma warning disable CS8601 // Possible null reference assignment.
-        sessionCookies[-1][key] = value;
+        data[key] = value;
 #pragma warning restore CS8601 // Possible null reference assignment.
     }
 
