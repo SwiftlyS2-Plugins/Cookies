@@ -46,33 +46,36 @@ public class PlayerCookiesAPIv1 : IPlayerCookiesAPIv1
         {
             var connection = core.Database.GetConnection("cookies");
 
-            var users = connection.Select<PlayerCookie>(u => u.SteamId64 == steamid);
-            var user = users.FirstOrDefault();
-
-            if (user == null)
+            Task.Run(async () =>
             {
-                user = new PlayerCookie
-                {
-                    SteamId64 = steamid,
-                    Data = []
-                };
-                var id = connection.Insert(user);
-                if (id is long longId)
-                {
-                    user.Id = (ulong)longId;
-                }
-                else if (id is ulong ulongId)
-                {
-                    user.Id = ulongId;
-                }
-                else
-                {
-                    throw new Exception("Unexpected ID type returned from database.");
-                }
-            }
+                var users = await connection.SelectAsync<PlayerCookie>(u => u.SteamId64 == steamid);
+                var user = users.FirstOrDefault();
 
-            user.Data = [];
-            connection.Update(user);
+                if (user == null)
+                {
+                    user = new PlayerCookie
+                    {
+                        SteamId64 = steamid,
+                        Data = []
+                    };
+                    var id = await connection.InsertAsync(user);
+                    if (id is long longId)
+                    {
+                        user.Id = (ulong)longId;
+                    }
+                    else if (id is ulong ulongId)
+                    {
+                        user.Id = ulongId;
+                    }
+                    else
+                    {
+                        throw new Exception("Unexpected ID type returned from database.");
+                    }
+                }
+
+                user.Data = [];
+                await connection.UpdateAsync(user);
+            });
         }
     }
 
@@ -112,19 +115,24 @@ public class PlayerCookiesAPIv1 : IPlayerCookiesAPIv1
                     SteamId64 = steamid,
                     Data = []
                 };
-                var id = connection.Insert(user);
-                if (id is long longId)
+                var userToInsert = user;
+
+                Task.Run(async () =>
                 {
-                    user.Id = (ulong)longId;
-                }
-                else if (id is ulong ulongId)
-                {
-                    user.Id = ulongId;
-                }
-                else
-                {
-                    throw new Exception("Unexpected ID type returned from database.");
-                }
+                    var id = await connection.InsertAsync(userToInsert);
+                    if (id is long longId)
+                    {
+                        userToInsert.Id = (ulong)longId;
+                    }
+                    else if (id is ulong ulongId)
+                    {
+                        userToInsert.Id = ulongId;
+                    }
+                    else
+                    {
+                        throw new Exception("Unexpected ID type returned from database.");
+                    }
+                });
             }
 
             return CookieValueConverter.Convert<T>(user.Data[key], jsonOptions);
@@ -161,38 +169,50 @@ public class PlayerCookiesAPIv1 : IPlayerCookiesAPIv1
 
             var users = connection.Select<PlayerCookie>(u => u.SteamId64 == steamid);
             var user = users.FirstOrDefault();
+            var isNewUser = user == null;
 
-            if (user == null)
+            if (isNewUser)
             {
                 user = new PlayerCookie
                 {
                     SteamId64 = steamid,
                     Data = []
                 };
-                var id = connection.Insert(user);
-                if (id is long longId)
-                {
-                    user.Id = (ulong)longId;
-                }
-                else if (id is ulong ulongId)
-                {
-                    user.Id = ulongId;
-                }
-                else
-                {
-                    throw new Exception("Unexpected ID type returned from database.");
-                }
             }
 
-            if (user.Data.TryGetValue(key, out var raw))
+            if (!isNewUser && user!.Data.TryGetValue(key, out var raw))
             {
                 return CookieValueConverter.Convert<T>(raw, jsonOptions);
             }
 
 #pragma warning disable CS8601 // Possible null reference assignment.
-            user.Data[key] = defaultValue;
+            user!.Data[key] = defaultValue;
 #pragma warning restore CS8601 // Possible null reference assignment.
-            connection.Update(user);
+
+            var userToPersist = user;
+
+            Task.Run(async () =>
+            {
+                if (isNewUser)
+                {
+                    var id = await connection.InsertAsync(userToPersist);
+                    if (id is long longId)
+                    {
+                        userToPersist.Id = (ulong)longId;
+                    }
+                    else if (id is ulong ulongId)
+                    {
+                        userToPersist.Id = ulongId;
+                    }
+                    else
+                    {
+                        throw new Exception("Unexpected ID type returned from database.");
+                    }
+                }
+
+                await connection.UpdateAsync(userToPersist);
+            });
+
             return defaultValue;
         }
     }
@@ -328,35 +348,38 @@ public class PlayerCookiesAPIv1 : IPlayerCookiesAPIv1
         {
             var connection = core.Database.GetConnection("cookies");
 
-            var users = connection.Select<PlayerCookie>(u => u.SteamId64 == steamid);
-            var user = users.FirstOrDefault();
-
-            if (user == null)
+            Task.Run(async () =>
             {
-                user = new PlayerCookie
+                var users = await connection.SelectAsync<PlayerCookie>(u => u.SteamId64 == steamid);
+                var user = users.FirstOrDefault();
+
+                if (user == null)
                 {
-                    SteamId64 = steamid,
-                    Data = []
-                };
-                var id = connection.Insert(user);
-                if (id is long longId)
-                {
-                    user.Id = (ulong)longId;
+                    user = new PlayerCookie
+                    {
+                        SteamId64 = steamid,
+                        Data = []
+                    };
+                    var id = await connection.InsertAsync(user);
+                    if (id is long longId)
+                    {
+                        user.Id = (ulong)longId;
+                    }
+                    else if (id is ulong ulongId)
+                    {
+                        user.Id = ulongId;
+                    }
+                    else
+                    {
+                        throw new Exception("Unexpected ID type returned from database.");
+                    }
                 }
-                else if (id is ulong ulongId)
-                {
-                    user.Id = ulongId;
-                }
-                else
-                {
-                    throw new Exception("Unexpected ID type returned from database.");
-                }
-            }
 
 #pragma warning disable CS8601 // Possible null reference assignment.
-            user.Data[key] = value;
+                user.Data[key] = value;
 #pragma warning restore CS8601 // Possible null reference assignment.
-            connection.Update(user);
+                await connection.UpdateAsync(user);
+            });
         }
     }
 
@@ -379,13 +402,16 @@ public class PlayerCookiesAPIv1 : IPlayerCookiesAPIv1
         {
             var connection = core.Database.GetConnection("cookies");
 
-            var users = connection.Select<PlayerCookie>(u => u.SteamId64 == steamid);
-            var user = users.FirstOrDefault();
-
-            if (user != null)
+            Task.Run(async () =>
             {
-                user.Data.Remove(key);
-            }
+                var users = await connection.SelectAsync<PlayerCookie>(u => u.SteamId64 == steamid);
+                var user = users.FirstOrDefault();
+
+                if (user != null)
+                {
+                    user.Data.Remove(key);
+                }
+            });
         }
     }
 }
