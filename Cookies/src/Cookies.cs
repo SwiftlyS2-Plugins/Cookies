@@ -1,138 +1,118 @@
-using System.Collections.Concurrent;
 using Cookies.API;
 using Cookies.Contract;
 using Cookies.Database;
+using Cookies.Storage;
 using Microsoft.Extensions.Logging;
 using SwiftlyS2.Shared;
 using SwiftlyS2.Shared.Events;
-using SwiftlyS2.Shared.Players;
 using SwiftlyS2.Shared.Plugins;
 
 namespace Cookies;
 
-[PluginMetadata(Id = "Cookies", Version = "1.0.14", Name = "Cookies", Author = "Swiftly Development Team")]
+[PluginMetadata(Id = "Cookies", Version = "1.0.15", Name = "Cookies", Author = "Swiftly Development Team")]
 public partial class Cookies : BasePlugin
 {
-    private ConcurrentDictionary<long, Dictionary<string, object>> CachedCookies = new();
-    private ConcurrentDictionary<long, Dictionary<string, object>> SessionCookies = new();
-    private ConcurrentQueue<long> SaveQueue = new();
-    private ConcurrentDictionary<long, IPlayer> playerBySteamId = new();
-    private CancellationTokenSource? saveTaskCancellationTokenSource;
-    private bool loaded = false;
+    private const string ConnectionName = "cookies";
+    // Also the longest a change made elsewhere (another server, a website) takes to show up here.
+    private const float MaintenanceIntervalSeconds = 5f;
+    private static readonly TimeSpan UnloadFlushTimeout = TimeSpan.FromSeconds(10);
 
-    private IServerCookiesAPIv1? ServerCookiesAPIv1;
-    private IPlayerCookiesAPIv1? PlayerCookiesAPIv1;
+    private readonly CookieStore store;
+    private readonly SessionStore sessions = new();
+    private CancellationTokenSource? maintenanceTimer;
 
     public Cookies(ISwiftlyCore core) : base(core)
     {
         try
         {
-            var connection = core.Database.GetConnection("cookies");
+            using var connection = core.Database.GetConnection(ConnectionName);
 
             MigrationRunner.RunMigrations(connection);
         }
         catch (Exception e)
         {
-            core.Logger.LogError(e, $"[Cookies] Failed to initialize database migrations.");
+            core.Logger.LogError(e, "[Cookies] Failed to initialize database migrations.");
         }
+
+        store = new CookieStore(new CookieRepository(() => core.Database.GetConnection(ConnectionName)), core.Logger);
     }
 
     public override void ConfigureSharedInterface(IInterfaceManager interfaceManager)
     {
         interfaceManager.AddSharedInterface<IServerCookiesAPIv1, ServerCookiesAPIv1>(
-            "Cookies.Server.v1", new ServerCookiesAPIv1(Core, ref CachedCookies, ref SaveQueue)
+            "Cookies.Server.v1", new ServerCookiesAPIv1(store)
         );
         interfaceManager.AddSharedInterface<IPlayerCookiesAPIv1, PlayerCookiesAPIv1>(
-            "Cookies.Player.v1", new PlayerCookiesAPIv1(Core, ref CachedCookies, ref SaveQueue, ref playerBySteamId)
+            "Cookies.Player.v1", new PlayerCookiesAPIv1(store)
         );
         interfaceManager.AddSharedInterface<IServerCookiesAPIv2, ServerCookiesAPIv2>(
-            "Cookies.Server.v2", new ServerCookiesAPIv2(Core, ref CachedCookies, ref SaveQueue, ref SessionCookies)
+            "Cookies.Server.v2", new ServerCookiesAPIv2(store, sessions)
         );
         interfaceManager.AddSharedInterface<IPlayerCookiesAPIv2, PlayerCookiesAPIv2>(
-            "Cookies.Player.v2", new PlayerCookiesAPIv2(Core, ref CachedCookies, ref SaveQueue, ref playerBySteamId, ref SessionCookies)
+            "Cookies.Player.v2", new PlayerCookiesAPIv2(store, sessions)
         );
-    }
-
-    public override void UseSharedInterface(IInterfaceManager interfaceManager)
-    {
-        ServerCookiesAPIv1 = interfaceManager.GetSharedInterface<IServerCookiesAPIv1>("Cookies.Server.v1");
-        PlayerCookiesAPIv1 = interfaceManager.GetSharedInterface<IPlayerCookiesAPIv1>("Cookies.Player.v1");
-
-        if (!loaded)
-        {
-            loaded = true;
-            Task.Run(async () =>
-            {
-                await ServerCookiesAPIv1.Load();
-            });
-        }
     }
 
     [EventListener<EventDelegates.OnClientPutInServer>]
     public void IOnClientPutInServerEvent(IOnClientPutInServerEvent @event)
     {
-        var playerid = @event.PlayerId;
+        var player = Core.PlayerManager.GetPlayer(@event.PlayerId);
+        if (player == null || !player.IsValid) return;
 
-        Task.Run(async () =>
-        {
-            if (PlayerCookiesAPIv1 == null) return;
+        store.PlayerConnected(@event.PlayerId, (long)player.SteamID);
+    }
 
-            var player = Core.PlayerManager.GetPlayer(playerid);
-            if (player == null) return;
+    // In strict Steam auth mode a player reads as SteamID 0, the bots' entry, until Steam authorizes them.
+    [EventListener<EventDelegates.OnClientSteamAuthorize>]
+    public void OnClientSteamAuthorize(IOnClientSteamAuthorizeEvent @event)
+    {
+        var player = Core.PlayerManager.GetPlayer(@event.PlayerId);
+        if (player == null || !player.IsValid) return;
 
-            await PlayerCookiesAPIv1.Load(player);
-        });
+        store.PlayerConnected(@event.PlayerId, (long)player.SteamID);
     }
 
     [EventListener<EventDelegates.OnClientDisconnected>]
     public void OnClientDisconnected(IOnClientDisconnectedEvent @event)
     {
-        var playerid = @event.PlayerId;
+        if (store.PlayerDisconnected(@event.PlayerId) is not { } steamid) return;
 
-        var player = Core.PlayerManager.GetPlayer(playerid);
-        if (player == null) return;
-
-        var steamid = player.SteamID;
-
-        Task.Run(async () =>
+        // A tick later, so other plugins' disconnect handlers can still read the session.
+        Core.Scheduler.NextTick(() =>
         {
-            if (PlayerCookiesAPIv1 == null) return;
-
-            await PlayerCookiesAPIv1.Save((long)steamid);
-
-            CachedCookies.TryRemove((long)steamid, out _);
-            playerBySteamId.TryRemove((long)steamid, out _);
+            if (!store.IsOnline(steamid)) sessions.Clear(steamid);
         });
     }
 
     public override void Load(bool hotReload)
     {
-        saveTaskCancellationTokenSource?.Cancel();
+        maintenanceTimer?.Cancel();
 
-        saveTaskCancellationTokenSource = Core.Scheduler.RepeatBySeconds(5f, () =>
+        _ = store.LoadAsync(CookieStore.ServerId);
+
+        // OnClientPutInServer never fires again for players already connected when the plugin (re)loads.
+        foreach (var player in Core.PlayerManager.GetAllPlayers())
         {
-            Task.Run(async () =>
-            {
-                if (PlayerCookiesAPIv1 == null || ServerCookiesAPIv1 == null) return;
+            if (player.IsValid) store.PlayerConnected(player.PlayerID, (long)player.SteamID);
+        }
 
-                while (SaveQueue.TryDequeue(out var steamid))
-                {
-                    if (steamid == -1) await ServerCookiesAPIv1.Save();
-                    else
-                    {
-                        var player = Core.PlayerManager.GetAllPlayers().FirstOrDefault(p => p.IsValid && (long)p.SteamID == steamid);
-
-                        if (player == null) continue;
-
-                        await PlayerCookiesAPIv1.Save(player);
-                    }
-                }
-            });
-        });
+        maintenanceTimer = Core.Scheduler.RepeatBySeconds(MaintenanceIntervalSeconds, () => _ = Task.Run(store.RunMaintenanceAsync));
     }
 
     public override void Unload()
     {
-        saveTaskCancellationTokenSource?.Cancel();
+        maintenanceTimer?.Cancel();
+
+        try
+        {
+            if (!Task.Run(() => store.FlushAsync(force: true)).Wait(UnloadFlushTimeout))
+            {
+                Core.Logger.LogWarning("[Cookies] Saving cookies on unload timed out; changes not yet saved may be lost.");
+            }
+        }
+        catch (Exception e)
+        {
+            Core.Logger.LogError(e, "[Cookies] Failed to save cookies on unload.");
+        }
     }
 }
