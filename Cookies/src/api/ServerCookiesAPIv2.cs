@@ -1,76 +1,23 @@
-using System.Collections.Concurrent;
 using Cookies.Contract;
-using SwiftlyS2.Shared;
+using Cookies.Storage;
 
 namespace Cookies.API;
 
 public class ServerCookiesAPIv2 : ServerCookiesAPIv1, IServerCookiesAPIv2
 {
-    private ConcurrentDictionary<long, Dictionary<string, object>> sessionCookies;
+    private readonly SessionStore sessions;
 
-    public ServerCookiesAPIv2(
-        ISwiftlyCore core,
-        ref ConcurrentDictionary<long, Dictionary<string, object>> cachedCookies,
-        ref ConcurrentQueue<long> saveQueue,
-        ref ConcurrentDictionary<long, Dictionary<string, object>> sessionCookies
-    ) : base(core, ref cachedCookies, ref saveQueue)
-    {
-        this.sessionCookies = sessionCookies;
-    }
+    internal ServerCookiesAPIv2(CookieStore store, SessionStore sessions) : base(store) => this.sessions = sessions;
 
-    public void ClearSession()
-    {
-        if (sessionCookies.TryGetValue(-1, out var value))
-        {
-            value.Clear();
-        }
-    }
+    public void ClearSession() => sessions.Clear(CookieStore.ServerId);
 
-    public T? GetSession<T>(string key)
-    {
-        if (sessionCookies.TryGetValue(-1, out var userCookies) && userCookies.TryGetValue(key, out var value))
-        {
-            try
-            {
-                return CookieValueConverter.Convert<T>(value, jsonOptions);
-            }
-            catch (Exception)
-            {
-                return default;
-            }
-        }
-        return default;
-    }
+    public T? GetSession<T>(string key) => sessions.Get<T>(CookieStore.ServerId, key);
 
-    public T? GetSessionOrDefault<T>(string key, T defaultValue)
-    {
-        if (!HasSession(key))
-        {
-            SetSession(key, defaultValue);
-            return defaultValue;
-        }
-        else return GetSession<T>(key);
-    }
+    public T? GetSessionOrDefault<T>(string key, T defaultValue) => sessions.GetOrAdd(CookieStore.ServerId, key, defaultValue);
 
-    public bool HasSession(string key)
-    {
-        return sessionCookies.TryGetValue(-1, out var userCookies) && userCookies.ContainsKey(key);
-    }
+    public bool HasSession(string key) => sessions.Has(CookieStore.ServerId, key);
 
-    public void SetSession<T>(string key, T value)
-    {
-        var data = sessionCookies.GetOrAdd(-1, static _ => new Dictionary<string, object>());
+    public void SetSession<T>(string key, T value) => sessions.Set(CookieStore.ServerId, key, value);
 
-#pragma warning disable CS8601 // Possible null reference assignment.
-        data[key] = value;
-#pragma warning restore CS8601 // Possible null reference assignment.
-    }
-
-    public void UnsetSession(string key)
-    {
-        if (sessionCookies.TryGetValue(-1, out var userCookies))
-        {
-            userCookies.Remove(key);
-        }
-    }
+    public void UnsetSession(string key) => sessions.Unset(CookieStore.ServerId, key);
 }

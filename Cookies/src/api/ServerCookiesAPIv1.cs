@@ -1,159 +1,34 @@
-using System.Collections.Concurrent;
-using System.Text.Json;
 using Cookies.Contract;
-using Cookies.Database.Models;
-using Dommel;
-using SwiftlyS2.Shared;
+using Cookies.Storage;
 
 namespace Cookies.API;
 
 public class ServerCookiesAPIv1 : IServerCookiesAPIv1
 {
-    private ISwiftlyCore Core;
-    private ConcurrentDictionary<long, Dictionary<string, object>> CachedCookies;
-    private ConcurrentQueue<long> SaveQueue;
-    protected JsonSerializerOptions jsonOptions = new() { IncludeFields = true };
+    private readonly CookieStore store;
 
-    public ServerCookiesAPIv1(ISwiftlyCore core, ref ConcurrentDictionary<long, Dictionary<string, object>> cachedCookies, ref ConcurrentQueue<long> saveQueue)
-    {
-        Core = core;
-        CachedCookies = cachedCookies;
-        SaveQueue = saveQueue;
-    }
+    internal ServerCookiesAPIv1(CookieStore store) => this.store = store;
 
-    public void Clear()
-    {
-        if (CachedCookies.TryGetValue(-1, out var value))
-        {
-            value.Clear();
-            if (!SaveQueue.Contains(-1))
-            {
-                SaveQueue.Enqueue(-1);
-            }
-        }
-    }
+    public void Clear() => store.Clear(CookieStore.ServerId);
 
-    public T? Get<T>(string key)
-    {
-        if (CachedCookies.TryGetValue(-1, out var userCookies) && userCookies.TryGetValue(key, out var value))
-        {
-            try
-            {
-                return CookieValueConverter.Convert<T>(value, jsonOptions);
-            }
-            catch (Exception)
-            {
-                return default;
-            }
-        }
-        return default;
-    }
+    public T? Get<T>(string key) =>
+        store.TryGet(CookieStore.ServerId, key, out var value) ? CookieJson.ConvertOrDefault<T>(value) : default;
 
     public T? GetOrDefault<T>(string key, T defaultValue)
     {
-        if (!Has(key))
-        {
-            Set(key, defaultValue);
-            return defaultValue;
-        }
-        else return Get<T>(key);
+        if (store.TryGet(CookieStore.ServerId, key, out var value)) return CookieJson.ConvertOrDefault<T>(value);
+
+        store.SetIfAbsent(CookieStore.ServerId, key, CookieJson.ToElement(defaultValue));
+        return defaultValue;
     }
 
-    public bool Has(string key)
-    {
-        return CachedCookies.TryGetValue(-1, out var data) && data.ContainsKey(key);
-    }
+    public bool Has(string key) => store.TryGet(CookieStore.ServerId, key, out _);
 
-    public async Task Load()
-    {
-        var connection = Core.Database.GetConnection("cookies");
+    public Task Load() => store.LoadAsync(CookieStore.ServerId);
 
-        var users = await connection.SelectAsync<PlayerCookie>(u => u.SteamId64 == -1);
-        var user = users.FirstOrDefault();
+    public Task Save() => store.SaveAsync(CookieStore.ServerId);
 
-        if (user == null)
-        {
-            user = new PlayerCookie
-            {
-                SteamId64 = -1,
-                Data = []
-            };
-            var id = await connection.InsertAsync(user);
-            if (id is long longId)
-            {
-                user.Id = (ulong)longId;
-            }
-            else if (id is ulong ulongId)
-            {
-                user.Id = ulongId;
-            }
-            else
-            {
-                throw new Exception("Unexpected ID type returned from database.");
-            }
-        }
+    public void Set<T>(string key, T value) => store.Set(CookieStore.ServerId, key, CookieJson.ToElement(value));
 
-        CachedCookies[-1] = user.Data;
-    }
-
-    public async Task Save()
-    {
-        var connection = Core.Database.GetConnection("cookies");
-
-        var users = await connection.SelectAsync<PlayerCookie>(u => u.SteamId64 == -1);
-        var user = users.FirstOrDefault();
-
-        if (user == null)
-        {
-            user = new PlayerCookie
-            {
-                SteamId64 = -1,
-                Data = []
-            };
-            var id = await connection.InsertAsync(user);
-            if (id is long longId)
-            {
-                user.Id = (ulong)longId;
-            }
-            else if (id is ulong ulongId)
-            {
-                user.Id = ulongId;
-            }
-            else
-            {
-                throw new Exception("Unexpected ID type returned from database.");
-            }
-        }
-
-        if (CachedCookies.TryGetValue(-1, out var data))
-        {
-            user.Data = data;
-        }
-
-        await connection.UpdateAsync(user);
-    }
-
-    public void Set<T>(string key, T value)
-    {
-        var data = CachedCookies.GetOrAdd(-1, static _ => new Dictionary<string, object>());
-
-#pragma warning disable CS8601 // Possible null reference assignment.
-        data[key] = value;
-#pragma warning restore CS8601 // Possible null reference assignment.
-        if (!SaveQueue.Contains(-1))
-        {
-            SaveQueue.Enqueue(-1);
-        }
-    }
-
-    public void Unset(string key)
-    {
-        if (CachedCookies.TryGetValue(-1, out var value) && value.Remove(key))
-        {
-            if (!SaveQueue.Contains(-1))
-            {
-                SaveQueue.Enqueue(-1);
-            }
-        }
-    }
+    public void Unset(string key) => store.Unset(CookieStore.ServerId, key);
 }
